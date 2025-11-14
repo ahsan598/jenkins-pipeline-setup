@@ -88,6 +88,7 @@ This architecture delivers a secure, scalable, and automated CI/CD pipeline acro
 ### 📚 References
 
 - [Jenkins Docs](https://www.jenkins.io/doc/)
+- [Jenkins Pipeline Syntax](https://www.jenkins.io/doc/book/pipeline/syntax/)
 - [Docker Docs](https://docs.docker.com/)
 - [Trivy Docs](https://trivy.dev/docs/)
 - [SonarQube Docs](https://docs.sonarsource.com/sonarqube-server)
