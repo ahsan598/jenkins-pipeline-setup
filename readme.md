@@ -1,87 +1,147 @@
-# 🚀 Jenkins CI/CD Pipeline Setup (Multi-Instance on AWS)
+# 🚀 Jenkins CI/CD Pipeline Setup
 
-A production-grade CI/CD architecture powered by **Jenkins**, integrated with **Docker, SonarQube, Nexus, and Trivy** for secure and automated software delivery — deployed across dedicated AWS EC2 instances.
-
-
-### 🎯 Overview
-This setup provisions a complete **DevOps pipeline** distributed across multiple EC2 instances for scalability and fault isolation:
-| Instance               | Purpose                     | Key Tools                  |
-| ---------------------- | --------------------------- | -------------------------- |
-| **Jenkins Server**     | CI/CD Orchestration         | Jenkins, Docker, Trivy     |
-| **SonarQube Server**   | Code Quality & Security     | SonarQube, PostgreSQL      |
-| **Nexus Server**       | Artifact & Image Repository | Nexus Repository Manager 3 |
-| **Kubernetes Cluster** | Application Deployment      | Kubernetes, kubectl, Helm  |
+A beginner-friendly CI/CD setup on AWS. This will demonstrates a hybrid architecture:
+- **Jenkins**: Runs directly on the EC2 instance.
+- **SonarQube & Nexus**: Run as Docker containers for easy management.
+- **Security**: Integrated with Trivy for vulnerability scanning.
 
 
-### 🎯 Key Objectives
-- Automate CI/CD pipelines using **Jenkins Declarative Pipelines**
-- Integrate **SonarQube** for code quality & security checks
-- Manage build artifacts via **Nexus Repository**
-- Use **Trivy** for vulnerability scanning
-- Deploy containerized apps to **Kubernetes**
+### 🎯 Architecture Overview
 
+| Component     | Hosted On             | Why?                                                          |
+|---------------|-----------------------|---------------------------------------------------------------|
+| **Jenkins**   | **EC2 Instance (VM)** | Gives Jenkins full access to the host for executing shell scripts and Docker commands easily.     |
+| **SonarQube** | **Docker Container**  | Keeps the database and dependencies isolated; easy to spin up/down.           |
+| **Nexus**     | **Docker Container**  | Simplifies storage management and updates.                    |
+| **Trivy**     | **EC2 Instance (VM)** | Installed directly for scanning files and images.             |
 
-### 🧠 Pipeline Workflow
+### 📂 Repository Structure
+This repo contains the configurations and scripts used in the pipeline.
 ```txt
-Developer → Git Push → Jenkins Pipeline → SonarQube Scan → Trivy Scan → Nexus Upload → Docker Build & Push → Kubernetes Deployment
+├── Jenkinsfile        # The main pipeline script
+├── scripts/           # Tools scripts (Jenkins, Docker, Trivy)
+├── config/            # Tools Configuration
+└── README.md          # This documentation
+```
+
+---
+
+### 🛠️ Prerequisites
+
+Before you start, ensure you have:
+1. **AWS EC2 Instance**: Ubuntu 24.04 or Amazon Linux 2024 (t3.medium recommended).
+2. **Security Group Ports**: Open these ports in your AWS Security Group:
+   - `8080` (Jenkins)
+   - `9000` (SonarQube)
+   - `8081` (Nexus)
+   - `22` (SSH)
+
+
+### ⚙️ Setup Guide
+
+We follow the official documentation for installations to ensure you always get the latest stable versions.
+
+**Step-1: Install Docker**
+
+Follow the official guide to install Docker Engine on your instance.
+👉 **[Official Docker Installation Guide (Ubuntu)](https://docs.docker.com/engine/install/ubuntu/)**
+
+**⚠️ Critical Configuration (After Install):**
+
+Once Docker is installed, you **must** configure permissions so Jenkins can run Docker commands later.
+
+```bash
+# 1. Add current user to docker group
+sudo usermod -aG docker $USER
+
+# 2. Apply permissions to Docker socket
+sudo chmod 666 /var/run/docker.sock
 ```
 
 
-### 📂 Project Structure:
-```txt
-Jenkins-Pipeline-Setup/
-├── Jenkins
-├── SonarQube
-├── Nexus
-├── scripts/
-├── configs/
-└── files/
+**Step-2: Install Jenkins (Using Script)**
+
+Follow the official guide to install Jenkins (Debian/Ubuntu).
+👉 [Official Jenkins Installation Guide](https://www.jenkins.io/doc/book/installing/linux/#debianubuntu)
+
+📝 Notes:
+- Ensure you install Java 17 or Java 21 (required by Jenkins).
+- After installation, run this command to give Jenkins access to Docker:
+
+```sh
+# Add Jenkins to Docker group
+sudo usermod -aG docker jenkins
+
+# Restart Jenkins to apply changes
+sudo systemctl restart jenkins
+```
+
+**Step-3: Install Trivy**
+
+Follow the official guide to install the Trivy security scanner.
+👉 [Official Trivy Installation Guide](https://trivy.dev/docs/latest/getting-started/installation/)
+
+
+**Step-4: Run SonarQube & Nexus (In Containers)**
+
+Since these run in containers, simply execute the following commands to start them with the correct network and volume settings.
+
+**1. Create a Network**
+```sh
+# Create dedicated Docker network
+sudo docker network create sonarnet
+```
+
+**2. Start SonarQube & Database**
+```sh
+# PostgreSQL Database for SonarQube
+sudo docker run -d \
+  --name sonar-db \
+  --network sonarnet \
+  -e POSTGRES_USER=sonar \
+  -e POSTGRES_PASSWORD=sonar \
+  -e POSTGRES_DB=sonar \
+  -v postgres-data:/var/lib/postgresql/data \
+  postgres:18-alpine
+
+# SonarQube Server
+sudo docker run -d \
+  --name sonarqube \
+  --network sonarnet \
+  -p 9000:9000 \
+  -e SONAR_JDBC_URL=jdbc:postgresql://sonar-db:5432/sonar \
+  -e SONAR_JDBC_USERNAME=sonar \
+  -e SONAR_JDBC_PASSWORD=sonar \
+  -v sonarqube-data:/opt/sonarqube/data \
+  sonarqube:community
+```
+
+**3. Start Nexus**
+```sh
+sudo docker run -d \
+  --name nexus \
+  -p 8081:8081 \
+  -v nexus-data:/nexus-data \
+  sonatype/nexus3:3.87.0
 ```
 
 
-### ⚙️ Setup Overview
-| Phase                   | Description                                                     |
-| ----------------------- | --------------------------------------------------------------- |
-| **1. Jenkins Setup**    | Install Jenkins, Docker, Trivy; configure plugins & credentials |
-| **2. SonarQube Setup**  | Deploy SonarQube + PostgreSQL for static code analysis          |
-| **3. Nexus Setup**      | Run Nexus Repository for Maven/Docker artifact storage          |
-| **4. Kubernetes Setup** | Deploy cluster and connect Jenkins via kubeconfig               |
-| **5. CI/CD Pipeline**   | Automate build, test, scan, and deploy workflow                 |
+### 🔍 Accessing Your Tools
+Once installed, access your tools via your browser:
+| Tool      | URL                       | Default Creds (First Login)                       |
+| --------- | ------------------------- | ------------------------------------------------- |
+| Jenkins   | http://<your-ec2-ip>:8080 | cat /var/lib/jenkins/secrets/initialAdminPassword |
+| SonarQube | http://<your-ec2-ip>:9000 | admin / admin                                     |
+| Nexus     | http://<your-ec2-ip>:8081 | Inside container: /nexus-data/admin.password      |
 
 
-### 📦 Pipeline Stages
-1. Checkout Source Code
-2. Build & Unit Test
-3. SonarQube Code Analysis
-4. Trivy Security Scan
-5. Publish Artifacts to Nexus
-6. Build & Push Docker Image
-7. Deploy to Kubernetes Cluster
-
-
-### 🔍 Access & Ports
-| Tool                                | Port     | URL Example                    |
-| ----------------------------------- | -------- | ------------------------------ |
-| **Jenkins**                         | `8080`   | http://<jenkins-ip>:8080       |
-| **SonarQube**                       | `9000`   | http://<sonarqube-ip>:9000     |
-| **Nexus**                           | `8081`   | http://<nexus-ip>:8081         |
-| **Kubernetes Dashboard (optional)** | `30000+` | http://<k8s-master>:<nodeport> |
-
-> 🔐 Ensure these ports are allowed in the AWS Security Group for respective EC2 instances.
-
-
-### 🔧 Toolchain Summary
-| Tool           | Function               | Instance Type             |
-| -------------- | ---------------------- | ------------------------- |
-| **Jenkins**    | Pipeline Orchestration | EC2 (t3.medium)           |
-| **SonarQube**  | Code Quality Analysis  | EC2 (t3.medium)           |
-| **Nexus**      | Artifact Repository    | EC2 (t3.medium)           |
-| **Trivy**      | Security Scanning      | Installed on Jenkins node |
-| **Kubernetes** | Application Deployment | Multi-node cluster        |
-
-
-### 🏁 Conclusion
-This architecture delivers a secure, scalable, and automated CI/CD pipeline across AWS instances — enabling faster, reliable, and policy-compliant software delivery.
+### 📝 Pipeline Workflow
+- **Git Checkout:** Jenkins pulls code from this repo.
+- **Build:** Compiles the application.
+- **SonarQube Analysis:** Checks code quality.
+- **Trivy Scan:** Scans filesystem using scripts in scripts/.
+- **Nexus Push:** Uploads the artifact.
+- **Docker Build & Push:** Creates image and pushes to registry.
 
 ---
 
@@ -93,4 +153,3 @@ This architecture delivers a secure, scalable, and automated CI/CD pipeline acro
 - [Trivy Docs](https://trivy.dev/docs/)
 - [SonarQube Docs](https://docs.sonarsource.com/sonarqube-server)
 - [Nexus Docs](https://help.sonatype.com/en/sonatype-nexus-repository.html)
-- [Kubernetes Docs](https://kubernetes.io/docs/home/)
