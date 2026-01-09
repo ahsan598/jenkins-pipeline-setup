@@ -2,13 +2,14 @@ pipeline {
     agent any
 
     tools {
-        jdk 'JDK-21'          // Ensure this matches jenkins tool name
-        maven 'Maven-3.9'     // Ensure this matches jenkins tool name
+        jdk 'JDK-21'                                    // Ensure this matches jenkins tool name
+        maven 'Maven-3'                                  // Ensure this matches jenkins tool name
     }
 
     environment {
-        DOCKER_REGISTRY = 'docker.io'                         // Docker Hub registry
-        DOCKER_IMAGE = 'user_id/myapp:${BUILD_NUMBER}'       // Use build number for versioning
+        DOCKER_REGISTRY = 'docker.io'                           // Docker Hub registry
+        DOCKER_IMAGE = 'username/myapp'                        // Docker image name
+        DOCKER_TAG = "${BUILD_NUMBER}"                        // Docker image tag
         SONAR_HOST = 'http://<server_ip>:9000'
         NEXUS_URL = 'http://<server_ip>:8081'
         K8S_NAMESPACE = 'webapps'                           // Kubernetes namespace
@@ -16,6 +17,12 @@ pipeline {
     }
 
     stages {
+        stage('Cleanup Workspace') {
+            steps {
+                cleanWs()
+            }
+        }
+        
         stage('Git Checkout') { 
             steps {
                 git branch: 'main', 
@@ -167,7 +174,7 @@ pipeline {
         success {
             echo 'Pipeline completed successfully!'
             script {
-                def deploymentUrl = "http://your-app-url"
+                def deploymentUrl = ${env.BUILD_NUMBER}
                 emailext (
                     subject: "Build Success: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                     body: """
