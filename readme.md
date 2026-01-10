@@ -1,4 +1,4 @@
-# 🚀 Jenkins CI/CD Pipeline Setup
+# Jenkins CI/CD Pipeline Setup
 
 A beginner-friendly CI/CD setup on AWS. This will demonstrates a hybrid architecture:
 - **Jenkins**: Runs directly on the EC2 instance.
@@ -6,7 +6,7 @@ A beginner-friendly CI/CD setup on AWS. This will demonstrates a hybrid architec
 - **Security**: Integrated with Trivy for vulnerability scanning.
 
 
-### 🎯 Architecture Overview
+### 🎯 Overview
 
 | Component     | Hosted On             | Why?                                                          |
 |---------------|-----------------------|---------------------------------------------------------------|
@@ -15,16 +15,16 @@ A beginner-friendly CI/CD setup on AWS. This will demonstrates a hybrid architec
 | **Nexus**     | **Docker Container**  | Simplifies storage management and updates.                    |
 | **Trivy**     | **EC2 Instance (VM)** | Installed directly for scanning files and images.             |
 
+
 ### 📂 Repository Structure
 This repo contains the configurations and scripts used in the pipeline.
-```txt
-├── Jenkinsfile        # The main pipeline script
-├── scripts/           # Tools scripts (Jenkins, Docker, Trivy)
-├── config/            # Tools Configuration
-└── README.md          # This documentation
-```
-
----
+  ```txt
+  ├── Jenkinsfile        # The main pipeline script
+  ├── scripts/           # Tools scripts (Jenkins, Docker, Trivy)
+  ├── config/            # Tools Configuration
+  ├── docker-compose     # Container setup of CICD
+  └── README.md          # This documentation
+  ```
 
 ### 🛠️ Prerequisites
 
@@ -37,7 +37,7 @@ Before you start, ensure you have:
    - `22` (SSH)
 
 
-### ⚙️ Setup Guide
+## ⚙️ Setup Guide
 
 We follow the official documentation for installations to ensure you always get the latest stable versions.
 
@@ -143,7 +143,6 @@ Once installed, access your tools via your browser:
 - **Nexus Push:** Uploads the artifact.
 - **Docker Build & Push:** Creates image and pushes to registry.
 
----
 
 ### 📚 References
 
