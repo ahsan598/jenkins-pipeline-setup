@@ -102,7 +102,7 @@ sudo docker run -d \
   -e POSTGRES_PASSWORD=sonar \
   -e POSTGRES_DB=sonar \
   -v postgres-data:/var/lib/postgresql/data \
-  postgres:18-alpine
+  postgres:18
 
 # SonarQube Server
 sudo docker run -d \
