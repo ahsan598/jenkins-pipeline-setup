@@ -132,7 +132,7 @@ Once installed, access your tools via your browser:
 | --------- | ------------------------- | ------------------------------------------------- |
 | Jenkins   | http://<your-ec2-ip>:8080 | cat /var/lib/jenkins/secrets/initialAdminPassword |
 | SonarQube | http://<your-ec2-ip>:9000 | admin / admin                                     |
-| Nexus     | http://<your-ec2-ip>:8081 | Inside container: /nexus-data/admin.password      |
+| Nexus     | http://<your-ec2-ip>:8081 | Inside container: cat /nexus-data/admin.password  |
 
 
 ### 📝 Pipeline Workflow
