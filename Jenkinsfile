@@ -2,24 +2,16 @@ pipeline {
     agent any
 
     tools {
-        jdk 'JDK-21'
-        maven 'Maven-3'
+        jdk 'jdk21'
+        maven 'maven3'
     }
 
     environment {
         DOCKER_REGISTRY = 'docker.io'
-        IMAGE_NAME = 'username/myapp' 
-        SONAR_HOST = 'http://<server_ip>:9000'
-        NEXUS_URL = 'http://<server_ip>:8081'
+        IMAGE_NAME = 'username/myapp'
     }
 
     stages {
-        stage('Cleanup Workspace') {
-            steps {
-                cleanWs()
-            }
-        }
-        
         stage('Git Checkout') { 
             steps {
                 git branch: 'main', 
@@ -27,14 +19,12 @@ pipeline {
                     credentialsId: 'github-token'
             }
         }
-
         stage('Code Compile') {
             steps {
                 sh "mvn clean compile"
             }
         }
-
-        stage('Run Tests') {
+        stage('Unit Tests') {
             steps {
                 sh "mvn test"
             }
@@ -44,7 +34,6 @@ pipeline {
                 }
             }
         }
-
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonar') {
@@ -52,7 +41,6 @@ pipeline {
                 }
             }
         }
-
         stage('Quality Gate') {
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
@@ -60,36 +48,25 @@ pipeline {
                 }
             }
         }
-
         stage('OWASP Dependency Check') {
             steps {
                 dependencyCheck additionalArguments: '--scan ./ --format HTML --out dependency-check-report.html', 
                                 odcInstallation: 'DC'
-                
-                publishHTML([allowMissing: true, 
-                             alwaysLinkToLastBuild: true, 
-                             keepAll: true, 
-                             reportDir: '.', 
-                             reportFiles: 'dependency-check-report.html', 
-                             reportName: 'OWASP Dependency Check'])
             }
         }
-
-        stage('Build Application') {
+        stage('Build Artifact') {
             steps {
                 sh "mvn package -DskipTests=true"
             }
         }
-
         stage('Deploy to Nexus') {
             steps {
-                configFileProvider([configFile(fileId: 'global-maven', variable: 'MAVEN_SETTINGS')]) {
-                    sh "mvn deploy -s $MAVEN_SETTINGS -DskipTests=true"
+                withMaven(globalMavenSettingsConfig: 'global-maven', traceability: true)  {
+                    sh "mvn deploy -DskipTests=true"
                 }
             }
         }
-
-        stage('Build Docker Image') {
+        stage('Docker Build & Tag') {
             steps {
                 script {
                     docker.build("${IMAGE_NAME}:${BUILD_NUMBER}", "-f docker/Dockerfile .")
@@ -97,29 +74,38 @@ pipeline {
                 }
             }
         }
-
-        stage('Trivy Image Scan') {
+        stage('Trivy Scan') {
             steps {
                 script {
-                    // JSON Report
-                    sh "trivy image --severity HIGH,CRITICAL --format json -o trivy-report.json ${IMAGE_NAME}:${BUILD_NUMBER}"
-                    sh "trivy image --severity HIGH,CRITICAL --format table ${IMAGE_NAME}:${BUILD_NUMBER}"
+                    sh "trivy image --format table -o trivy-image-report.html ${IMAGE_NAME}:${BUILD_NUMBER}"
                 }
             }
         }
-
-        stage('Push Docker Image') {
+        stage('Push to Registry') {
             steps {
                 script {
                     withDockerRegistry(credentialsId: 'docker-cred', url: "https://${DOCKER_REGISTRY}") {
-                        sh "docker push ${IMAGE_NAME}:${BUILD_NUMBER}"
                         sh "docker push ${IMAGE_NAME}:latest"
                     }
                 }
             }
         }
+        stage('Deploy To Kubernetes') {
+            steps {
+               withKubeConfig(caCertificate: '', clusterName: 'kubernetes', contextName: '', credentialsId: 'k8s-cred', namespace: 'webapps', restrictKubeConfigAccess: false, serverUrl: 'https://172.31.8.146:6443') {
+                        sh "kubectl apply -f manifest/deployment-service.yaml"
+                }
+            }
+        }
+        stage('Verify the Deployment') {
+            steps {
+               withKubeConfig(caCertificate: '', clusterName: 'kubernetes', contextName: '', credentialsId: 'k8s-cred', namespace: 'webapps', restrictKubeConfigAccess: false, serverUrl: 'https://172.31.8.146:6443') {
+                        sh "kubectl get pods -n webapps"
+                        sh "kubectl get svc -n webapps"
+                }
+            }
+        }
     }
-
     post {
         success {
             script {
@@ -153,13 +139,11 @@ pipeline {
                 )
             }
         }
-
         always {
             echo 'Cleaning up workspace...'
             // Archive artifacts
             archiveArtifacts artifacts: '**/trivy-report.json, **/dependency-check-report.html', 
                              allowEmptyArchive: true
-            
             cleanWs()
         }
     }
