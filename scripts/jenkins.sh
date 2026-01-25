@@ -10,11 +10,11 @@
 sudo apt update
 
 # Install Java (Jenkins dependency)
-sudo apt install openjdk-21-jre-headless -y
+sudo apt install openjdk-21-jdk -y
 
 # Download Jenkins GPG key
 sudo wget -O /etc/apt/keyrings/jenkins-keyring.asc \
-  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+  https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key
 
 # Add Jenkins repository to package manager sources
 echo "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc]" \
