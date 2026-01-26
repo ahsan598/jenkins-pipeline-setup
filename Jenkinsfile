@@ -7,7 +7,6 @@ pipeline {
     }
 
     environment {
-        DOCKER_REGISTRY = 'docker.io'
         IMAGE_NAME = 'username/myapp'
     }
 
@@ -59,7 +58,7 @@ pipeline {
                 sh "mvn package -DskipTests=true"
             }
         }
-        stage('Deploy to Nexus') {
+        stage('Nexus Upload') {
             steps {
                 withMaven(globalMavenSettingsConfig: 'global-maven', traceability: true)  {
                     sh "mvn deploy -DskipTests=true"
@@ -69,8 +68,7 @@ pipeline {
         stage('Docker Build & Tag') {
             steps {
                 script {
-                    docker.build("${IMAGE_NAME}:${BUILD_NUMBER}", "-f docker/Dockerfile .")
-                    sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${IMAGE_NAME}:latest"
+                    sh "docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} -f docker/Dockerfile ."
                 }
             }
         }
@@ -84,8 +82,8 @@ pipeline {
         stage('Push to Registry') {
             steps {
                 script {
-                    withDockerRegistry(credentialsId: 'docker-cred', url: "https://${DOCKER_REGISTRY}") {
-                        sh "docker push ${IMAGE_NAME}:latest"
+                    withDockerRegistry(credentialsId: 'docker-cred') {
+                        sh "docker push ${IMAGE_NAME}:${BUILD_NUMBER}"
                     }
                 }
             }
@@ -93,6 +91,7 @@ pipeline {
         stage('Deploy To Kubernetes') {
             steps {
                withKubeConfig(caCertificate: '', clusterName: 'kubernetes', contextName: '', credentialsId: 'k8s-cred', namespace: 'webapps', restrictKubeConfigAccess: false, serverUrl: 'https://172.31.8.146:6443') {
+                        sh "kubectl create ns webapps"
                         sh "kubectl apply -f manifest/deployment-service.yaml"
                 }
             }
